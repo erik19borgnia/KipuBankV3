@@ -16,6 +16,11 @@
 						"internalType": "address",
 						"name": "_feed",
 						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "_factory",
+						"type": "address"
 					}
 				],
 				"stateMutability": "nonpayable",
@@ -160,6 +165,31 @@
 				"type": "error"
 			},
 			{
+				"inputs": [],
+				"name": "SwapModule_InsufficientLiquidity",
+				"type": "error"
+			},
+			{
+				"inputs": [],
+				"name": "SwapModule_InsufficientOutputAmount",
+				"type": "error"
+			},
+			{
+				"inputs": [],
+				"name": "SwapModule_InvalidAddress",
+				"type": "error"
+			},
+			{
+				"inputs": [],
+				"name": "SwapModule_InvalidAmount",
+				"type": "error"
+			},
+			{
+				"inputs": [],
+				"name": "SwapModule_PairDoesNotExist",
+				"type": "error"
+			},
+			{
 				"anonymous": false,
 				"inputs": [
 					{
@@ -286,6 +316,56 @@
 				"type": "event"
 			},
 			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "user",
+						"type": "address"
+					},
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "tokenIn",
+						"type": "address"
+					},
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "tokenOut",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "amountIn",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "amountOut",
+						"type": "uint256"
+					}
+				],
+				"name": "SwapModule_SwapExecuted",
+				"type": "event"
+			},
+			{
+				"inputs": [],
+				"name": "FACTORY",
+				"outputs": [
+					{
+						"internalType": "contract IUniswapV2Factory",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
 				"inputs": [
 					{
 						"internalType": "address",
@@ -311,6 +391,35 @@
 				"type": "function"
 			},
 			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "amountIn",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "reserveIn",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "reserveOut",
+						"type": "uint256"
+					}
+				],
+				"name": "getAmountOut",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "amountOut",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "pure",
+				"type": "function"
+			},
+			{
 				"inputs": [],
 				"name": "getBalance",
 				"outputs": [
@@ -530,6 +639,30 @@
 						"internalType": "uint256",
 						"name": "withdrawals_",
 						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "tokenA",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "tokenB",
+						"type": "address"
+					}
+				],
+				"name": "getPair",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "pair",
+						"type": "address"
 					}
 				],
 				"stateMutability": "view",
@@ -643,6 +776,40 @@
 				"inputs": [
 					{
 						"internalType": "address",
+						"name": "tokenIn",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "tokenOut",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amountIn",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amountOutMin",
+						"type": "uint256"
+					}
+				],
+				"name": "swapExactInputSingle",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "amountOut",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
 						"name": "newOwner",
 						"type": "address"
 					}
@@ -715,6 +882,17 @@
 						"_tokenAddress": "La dirección del contrato del token a depositar"
 					}
 				},
+				"getAmountOut(uint256,uint256,uint256)": {
+					"details": "Implementa la fórmula AMM de Uniswap V2: amountOut = (amountIn * 997 * reserveOut) / (reserveIn * 1000 + amountIn * 997)",
+					"params": {
+						"amountIn": "Cantidad de entrada",
+						"reserveIn": "Reserva del token de entrada",
+						"reserveOut": "Reserva del token de salida"
+					},
+					"returns": {
+						"amountOut": "Cantidad calculada de salida"
+					}
+				},
 				"getBalance(address)": {
 					"details": "Esta función garantiza que toda la información es auditable",
 					"params": {
@@ -769,6 +947,15 @@
 						"user_": "Usuario que se quiere auditar"
 					}
 				},
+				"getPair(address,address)": {
+					"params": {
+						"tokenA": "Primer token",
+						"tokenB": "Segundo token"
+					},
+					"returns": {
+						"pair": "Dirección del par"
+					}
+				},
 				"getWithdrawals(address)": {
 					"details": "Esta función garantiza que toda la información es auditable",
 					"params": {
@@ -785,6 +972,18 @@
 					"details": "Sólo puede ser llamada por el propietario",
 					"params": {
 						"_feed": "La nueva dirección del Price Feed"
+					}
+				},
+				"swapExactInputSingle(address,address,uint256,uint256)": {
+					"details": "Esta función sigue las mejores prácticas de Uniswap V2",
+					"params": {
+						"amountIn": "La cantidad a intercambiar",
+						"amountOutMin": "La cantidad mínima aceptada después de un swap",
+						"tokenIn": "La dirección del token de entrada",
+						"tokenOut": "La dirección del token de salida"
+					},
+					"returns": {
+						"amountOut": "cantidad de tokens recibidos"
 					}
 				},
 				"transferOwnership(address)": {
@@ -843,6 +1042,31 @@
 					{
 						"notice": "Error emitido cuando la última actualización del oráculo supera el heartbeat"
 					}
+				],
+				"SwapModule_InsufficientLiquidity()": [
+					{
+						"notice": "Error emitido cuando se intenta swapear un token sin liquidez"
+					}
+				],
+				"SwapModule_InsufficientOutputAmount()": [
+					{
+						"notice": "Error emitido cuando se intenta swapear una cantidad insuficiente"
+					}
+				],
+				"SwapModule_InvalidAddress()": [
+					{
+						"notice": "Error emitido cuando se intenta swapear con una dirección inválida"
+					}
+				],
+				"SwapModule_InvalidAmount()": [
+					{
+						"notice": "Error emitido cuando se intenta swapear una cantidad inválida"
+					}
+				],
+				"SwapModule_PairDoesNotExist()": [
+					{
+						"notice": "Error emitido cuando se intenta swapear un par que no existe"
+					}
 				]
 			},
 			"events": {
@@ -860,15 +1084,24 @@
 				},
 				"Extracted(address,uint256)": {
 					"notice": "Evento emitido al extraer exitosamente"
+				},
+				"SwapModule_SwapExecuted(address,address,address,uint256,uint256)": {
+					"notice": "Evento emitido al ejecutar un swap por UniSwap"
 				}
 			},
 			"kind": "user",
 			"methods": {
+				"FACTORY()": {
+					"notice": "Factory de Uniswap V2 para obtener pares"
+				},
 				"depositERC20(address,uint256)": {
 					"notice": "Función externa para recibir depósitos de tokens ERC20Emite un evento cuando la transacción es exitosa."
 				},
 				"depositEth()": {
 					"notice": "Función para hacer un depósitoSólo se puede depositar un valor mayor a 0, siempre que no se supere el bankCap"
+				},
+				"getAmountOut(uint256,uint256,uint256)": {
+					"notice": "Función auxiliar para calcular la cantidad de salida"
 				},
 				"getBalance()": {
 					"notice": "Función pública para ver el balance de ETH que uno mismo tiene"
@@ -906,6 +1139,9 @@
 				"getERC20Withdrawals(address,address)": {
 					"notice": "Función onlyOwner para ver la cantidad de extracciones que algún usuario hizo de algún token ERC20"
 				},
+				"getPair(address,address)": {
+					"notice": "Función para obtener el par de tokens"
+				},
 				"getWithdrawals()": {
 					"notice": "Función pública para ver la cantidad de extracciones de ETH que uno hizo"
 				},
@@ -923,6 +1159,9 @@
 				},
 				"setFeeds(address)": {
 					"notice": "Función para actualizar el Chainlink Price Feed"
+				},
+				"swapExactInputSingle(address,address,uint256,uint256)": {
+					"notice": "Función para ejecutar swaps de inputs exactos en Uniswap V2Los outputs pueden variar según el valor mínimo amountOutMin"
 				},
 				"withdrawERC20(address,uint256)": {
 					"notice": "Función para hacer un depósito"
@@ -945,10 +1184,11 @@
 			"bytecodeHash": "ipfs"
 		},
 		"optimizer": {
-			"enabled": false,
+			"enabled": true,
 			"runs": 200
 		},
-		"remappings": []
+		"remappings": [],
+		"viaIR": true
 	},
 	"sources": {
 		"@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol": {
@@ -1023,12 +1263,26 @@
 				"dweb:/ipfs/QmadRjHbkicwqwwh61raUEapaVEtaLMcYbQZWs9gUkgj3u"
 			]
 		},
+		"@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol": {
+			"keccak256": "0xe5905c0989cf5a865ed9bb7b9252536ca011c5b744017a82a7d4443b9c00a891",
+			"urls": [
+				"bzz-raw://5d2a90a0a796491507462a3da18c3f8819721d571572d765a2207c35bf0a0389",
+				"dweb:/ipfs/Qmf9ACYiT3qzjgsYuhm866FBdiBpRMXAPpQhSFbgqcyhHt"
+			]
+		},
+		"@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol": {
+			"keccak256": "0x7c9bc70e5996c763e02ff38905282bc24fb242b0ef2519a003b36824fc524a4b",
+			"urls": [
+				"bzz-raw://85d5ad2dd23ee127f40907a12865a1e8cb5828814f6f2480285e1827dd72dedf",
+				"dweb:/ipfs/QmayKQWJgWmr46DqWseADyUanmqxh662hPNdAkdHRjiQQH"
+			]
+		},
 		"contracts/KipuBankV3.sol": {
-			"keccak256": "0xe9fbe26a3fccdbcab86d5c092a3f1772fb21e54129d6196701966df88d041ca0",
+			"keccak256": "0x844114d04fba0603d6567a85e9adda90b5954970363a38e83aa21203195c494c",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://407c836cc06e0667956b4198d7abdafc3b3c5a2bfc785bf42f5704fbe6b885d0",
-				"dweb:/ipfs/QmPpfjmBTLNC82L8N3ExRNsLjJANxKKqTRvGFs22Kq7tXH"
+				"bzz-raw://b14670aec1a87a0c41334a5ffd394606f5ce2cbe5d344ca5f390244a14ec6199",
+				"dweb:/ipfs/QmNxdKdzURZDedKEjiPZ4Ee991L2wzHX5cRREHZ4t5K6pW"
 			]
 		}
 	},
