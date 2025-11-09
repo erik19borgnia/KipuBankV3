@@ -45,6 +45,7 @@ contract KipuBankV3 is Ownable{
     //0x694AA1769357215DE4FAC081bf1f309aDC325306 Ethereum ETH/USD
     /// @notice Factory de Uniswap V2 para obtener pares
     IUniswapV2Factory public immutable FACTORY;
+    //0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f Factory en la Mainnet
 
     ////////////////////
     //MAPPINGS DE TODO//
