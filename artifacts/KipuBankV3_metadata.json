@@ -19,7 +19,12 @@
 					},
 					{
 						"internalType": "address",
-						"name": "_factory",
+						"name": "_router",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "_usdc",
 						"type": "address"
 					}
 				],
@@ -190,6 +195,22 @@
 				"type": "error"
 			},
 			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "to",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					}
+				],
+				"name": "USDCExtractionNotAllowed",
+				"type": "error"
+			},
+			{
 				"anonymous": false,
 				"inputs": [
 					{
@@ -353,11 +374,49 @@
 				"type": "event"
 			},
 			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "address",
+						"name": "from",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					}
+				],
+				"name": "USDCDeposited",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "address",
+						"name": "to",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					}
+				],
+				"name": "USDCExtracted",
+				"type": "event"
+			},
+			{
 				"inputs": [],
-				"name": "FACTORY",
+				"name": "USDC",
 				"outputs": [
 					{
-						"internalType": "contract IUniswapV2Factory",
+						"internalType": "address",
 						"name": "",
 						"type": "address"
 					}
@@ -376,6 +435,16 @@
 						"internalType": "uint256",
 						"name": "_amount",
 						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "_minOut",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "_deadline",
+						"type": "uint256"
 					}
 				],
 				"name": "depositERC20",
@@ -391,35 +460,6 @@
 				"type": "function"
 			},
 			{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "amountIn",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "reserveIn",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "reserveOut",
-						"type": "uint256"
-					}
-				],
-				"name": "getAmountOut",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "amountOut",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "pure",
-				"type": "function"
-			},
-			{
 				"inputs": [],
 				"name": "getBalance",
 				"outputs": [
@@ -639,30 +679,6 @@
 						"internalType": "uint256",
 						"name": "withdrawals_",
 						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "tokenA",
-						"type": "address"
-					},
-					{
-						"internalType": "address",
-						"name": "tokenB",
-						"type": "address"
-					}
-				],
-				"name": "getPair",
-				"outputs": [
-					{
-						"internalType": "address",
-						"name": "pair",
-						"type": "address"
 					}
 				],
 				"stateMutability": "view",
@@ -722,6 +738,19 @@
 			},
 			{
 				"inputs": [],
+				"name": "router",
+				"outputs": [
+					{
+						"internalType": "contract IUniswapV2Router02",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
 				"name": "s_bankCap",
 				"outputs": [
 					{
@@ -741,6 +770,19 @@
 						"internalType": "contract AggregatorV3Interface",
 						"name": "",
 						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "s_totalUSDC",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
 					}
 				],
 				"stateMutability": "view",
@@ -769,40 +811,6 @@
 				],
 				"name": "setFeeds",
 				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "tokenIn",
-						"type": "address"
-					},
-					{
-						"internalType": "address",
-						"name": "tokenOut",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "amountIn",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "amountOutMin",
-						"type": "uint256"
-					}
-				],
-				"name": "swapExactInputSingle",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "amountOut",
-						"type": "uint256"
-					}
-				],
 				"stateMutability": "nonpayable",
 				"type": "function"
 			},
@@ -851,6 +859,19 @@
 				"type": "function"
 			},
 			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_amount",
+						"type": "uint256"
+					}
+				],
+				"name": "withdrawUSDC",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
 				"stateMutability": "payable",
 				"type": "receive"
 			}
@@ -876,21 +897,10 @@
 			},
 			"kind": "dev",
 			"methods": {
-				"depositERC20(address,uint256)": {
+				"depositERC20(address,uint256,uint256,uint256)": {
 					"params": {
 						"_amount": "La cantidad a depositar de USDC",
 						"_tokenAddress": "La dirección del contrato del token a depositar"
-					}
-				},
-				"getAmountOut(uint256,uint256,uint256)": {
-					"details": "Implementa la fórmula AMM de Uniswap V2: amountOut = (amountIn * 997 * reserveOut) / (reserveIn * 1000 + amountIn * 997)",
-					"params": {
-						"amountIn": "Cantidad de entrada",
-						"reserveIn": "Reserva del token de entrada",
-						"reserveOut": "Reserva del token de salida"
-					},
-					"returns": {
-						"amountOut": "Cantidad calculada de salida"
 					}
 				},
 				"getBalance(address)": {
@@ -947,15 +957,6 @@
 						"user_": "Usuario que se quiere auditar"
 					}
 				},
-				"getPair(address,address)": {
-					"params": {
-						"tokenA": "Primer token",
-						"tokenB": "Segundo token"
-					},
-					"returns": {
-						"pair": "Dirección del par"
-					}
-				},
 				"getWithdrawals(address)": {
 					"details": "Esta función garantiza que toda la información es auditable",
 					"params": {
@@ -974,18 +975,6 @@
 						"_feed": "La nueva dirección del Price Feed"
 					}
 				},
-				"swapExactInputSingle(address,address,uint256,uint256)": {
-					"details": "Esta función sigue las mejores prácticas de Uniswap V2",
-					"params": {
-						"amountIn": "La cantidad a intercambiar",
-						"amountOutMin": "La cantidad mínima aceptada después de un swap",
-						"tokenIn": "La dirección del token de entrada",
-						"tokenOut": "La dirección del token de salida"
-					},
-					"returns": {
-						"amountOut": "cantidad de tokens recibidos"
-					}
-				},
 				"transferOwnership(address)": {
 					"details": "Transfers ownership of the contract to a new account (`newOwner`). Can only be called by the current owner."
 				},
@@ -1000,6 +989,12 @@
 					"details": "Sólo se puede depositar un valor mayor a 0, siempre que no se supere el bankCap",
 					"params": {
 						"_amount": "Cantidad que se quiere extraer. Debe ser <= al balance y al límite de extracción"
+					}
+				},
+				"withdrawUSDC(uint256)": {
+					"details": "Sólo se puede depositar un valor mayor a 0, siempre que no se supere el bankCap",
+					"params": {
+						"_amount": "Cantidad que se quiere extraer. Debe ser <= al balance"
 					}
 				}
 			},
@@ -1067,6 +1062,11 @@
 					{
 						"notice": "Error emitido cuando se intenta swapear un par que no existe"
 					}
+				],
+				"USDCExtractionNotAllowed(address,uint256)": [
+					{
+						"notice": "Error emitido cuando se intenta extraer una cantidad inválda de USDC (<=0, >saldo)"
+					}
 				]
 			},
 			"events": {
@@ -1087,21 +1087,24 @@
 				},
 				"SwapModule_SwapExecuted(address,address,address,uint256,uint256)": {
 					"notice": "Evento emitido al ejecutar un swap por UniSwap"
+				},
+				"USDCDeposited(address,uint256)": {
+					"notice": "Evento emitido al depositar USDC exitosamente"
+				},
+				"USDCExtracted(address,uint256)": {
+					"notice": "Evento emitido al extraer USDC exitosamente"
 				}
 			},
 			"kind": "user",
 			"methods": {
-				"FACTORY()": {
-					"notice": "Factory de Uniswap V2 para obtener pares"
+				"USDC()": {
+					"notice": "Address de USDC"
 				},
-				"depositERC20(address,uint256)": {
+				"depositERC20(address,uint256,uint256,uint256)": {
 					"notice": "Función externa para recibir depósitos de tokens ERC20Emite un evento cuando la transacción es exitosa."
 				},
 				"depositEth()": {
 					"notice": "Función para hacer un depósitoSólo se puede depositar un valor mayor a 0, siempre que no se supere el bankCap"
-				},
-				"getAmountOut(uint256,uint256,uint256)": {
-					"notice": "Función auxiliar para calcular la cantidad de salida"
 				},
 				"getBalance()": {
 					"notice": "Función pública para ver el balance de ETH que uno mismo tiene"
@@ -1139,34 +1142,37 @@
 				"getERC20Withdrawals(address,address)": {
 					"notice": "Función onlyOwner para ver la cantidad de extracciones que algún usuario hizo de algún token ERC20"
 				},
-				"getPair(address,address)": {
-					"notice": "Función para obtener el par de tokens"
-				},
 				"getWithdrawals()": {
 					"notice": "Función pública para ver la cantidad de extracciones de ETH que uno hizo"
 				},
 				"getWithdrawals(address)": {
 					"notice": "Función onlyOwner para ver la cantidad de extracciones de ETH que algún usuario hizo"
 				},
+				"router()": {
+					"notice": "Router de Uniswap V2"
+				},
 				"s_bankCap()": {
-					"notice": "Límite de balance por cuenta"
+					"notice": "Límite de balance del banco (en USDC)"
 				},
 				"s_feeds()": {
 					"notice": "variable para almacenar la dirección del Chainlink Feed"
 				},
+				"s_totalUSDC()": {
+					"notice": "Balance del banco (en USDC)"
+				},
 				"s_withdrawLimit()": {
-					"notice": "Límite de extracción por cuenta"
+					"notice": "Límite de extracción por cuenta (en USDC)"
 				},
 				"setFeeds(address)": {
 					"notice": "Función para actualizar el Chainlink Price Feed"
-				},
-				"swapExactInputSingle(address,address,uint256,uint256)": {
-					"notice": "Función para ejecutar swaps de inputs exactos en Uniswap V2Los outputs pueden variar según el valor mínimo amountOutMin"
 				},
 				"withdrawERC20(address,uint256)": {
 					"notice": "Función para hacer un depósito"
 				},
 				"withdrawEth(uint256)": {
+					"notice": "Función para hacer un depósito"
+				},
+				"withdrawUSDC(uint256)": {
 					"notice": "Función para hacer un depósito"
 				}
 			},
@@ -1184,11 +1190,10 @@
 			"bytecodeHash": "ipfs"
 		},
 		"optimizer": {
-			"enabled": true,
+			"enabled": false,
 			"runs": 200
 		},
-		"remappings": [],
-		"viaIR": true
+		"remappings": []
 	},
 	"sources": {
 		"@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol": {
@@ -1263,26 +1268,12 @@
 				"dweb:/ipfs/QmadRjHbkicwqwwh61raUEapaVEtaLMcYbQZWs9gUkgj3u"
 			]
 		},
-		"@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol": {
-			"keccak256": "0xe5905c0989cf5a865ed9bb7b9252536ca011c5b744017a82a7d4443b9c00a891",
-			"urls": [
-				"bzz-raw://5d2a90a0a796491507462a3da18c3f8819721d571572d765a2207c35bf0a0389",
-				"dweb:/ipfs/Qmf9ACYiT3qzjgsYuhm866FBdiBpRMXAPpQhSFbgqcyhHt"
-			]
-		},
-		"@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol": {
-			"keccak256": "0x7c9bc70e5996c763e02ff38905282bc24fb242b0ef2519a003b36824fc524a4b",
-			"urls": [
-				"bzz-raw://85d5ad2dd23ee127f40907a12865a1e8cb5828814f6f2480285e1827dd72dedf",
-				"dweb:/ipfs/QmayKQWJgWmr46DqWseADyUanmqxh662hPNdAkdHRjiQQH"
-			]
-		},
 		"contracts/KipuBankV3.sol": {
-			"keccak256": "0x6fe6dca1947ec51bc59ed6f6e10706d01f1c385cdbcd710be47582fdb06db3c0",
+			"keccak256": "0x0ed466894da717824d0c153271c54dad6dc113d7c0d662bd9d59c43165e9f2dd",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://722b8a6b6be4501af059dc60b4dbc7f190d8b38733fd920d2a5021d517ef1a95",
-				"dweb:/ipfs/QmfDGionW4x4HD3pRNTrojr9GzZxqpd8hMeRMvMM39iVDe"
+				"bzz-raw://b5c119a084bdd5d72d5908fa97171e626c22c43fcc5ae7aafc750b9dbb31d1e3",
+				"dweb:/ipfs/QmbfLvpYMbFxeq48nYHSmvg5uJrZSBMnjXeLPX3UabhnTX"
 			]
 		}
 	},

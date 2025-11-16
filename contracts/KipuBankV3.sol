@@ -16,9 +16,26 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
         Interfaces
 ///////////////////////*/
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IUniswapV2Factory} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
-import {IUniswapV2Pair} from "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+
+
+interface IUniswapV2Router02 {
+    function WETH() external view returns (address);
+    function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts);
+    function swapExactTokensForTokens(
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external returns (uint[] memory amounts);
+    function swapExactETHForTokens(
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external payable returns (uint[] memory amounts);
+}
 
 /**
  * @title KipuBank V3
@@ -43,9 +60,11 @@ contract KipuBankV3 is Ownable{
     ///@notice variable para almacenar la dirección del Chainlink Feed
     AggregatorV3Interface public s_feeds;
     //0x694AA1769357215DE4FAC081bf1f309aDC325306 Ethereum ETH/USD
-    /// @notice Factory de Uniswap V2 para obtener pares
-    IUniswapV2Factory public immutable FACTORY;
+    /// @notice Router de Uniswap V2
+    IUniswapV2Router02 public router;
     //0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f Factory en la Mainnet
+    /// @notice Address de USDC
+    address public USDC;
 
     ////////////////////
     //MAPPINGS DE TODO//
@@ -57,11 +76,13 @@ contract KipuBankV3 is Ownable{
     ///@notice Mapping que mantienen la cantidad de extracciones de tokens ERC20  de las distintas cuentas
     mapping (address user => mapping (address token => uint32 amount)) s_withdrawals;
     
-    ///@notice Límite de balance por cuenta
+    ///@notice Límite de balance del banco (en USDC)
     uint128 public immutable s_bankCap;
-    ///@notice Límite de extracción por cuenta
-    uint128 public immutable s_withdrawLimit = 1*10**18; //1.000.000.000.000.000.000
-    //1*10^18 necesita menos de 128 bits, pero por coherencia se lo deja uint128. En wei es equivalente a 1 ETH.
+    ///@notice Balance del banco (en USDC)
+    uint256 public s_totalUSDC;
+    ///@notice Límite de extracción por cuenta (en USDC)
+    uint128 public immutable s_withdrawLimit = 1*10**6; //1.000.000
+    //1*10^6 necesita menos de 128 bits, pero por coherencia se lo deja uint128. En unidades de USDC es equivalente a 1 USDC.
 
     ///@notice Evento emitido al depositar exitosamente
     event Deposited(address from, uint amount);
@@ -69,8 +90,12 @@ contract KipuBankV3 is Ownable{
     event Extracted(address to, uint amount);
     ///@notice Evento emitido al depositar USDC exitosamente
     event ERC20Deposited(address from, address tokenAddress, uint amount);
+    ///@notice Evento emitido al depositar USDC exitosamente
+    event USDCDeposited(address from, uint amount);
     ///@notice Evento emitido al extraer USDC exitosamente
     event ERC20Extracted(address to, address tokenAddress, uint amount);
+    ///@notice Evento emitido al extraer USDC exitosamente
+    event USDCExtracted(address to, uint amount);
     ///@notice Evento emitido al extraer USDC exitosamente
     event ChainlinkFeedUpdated(AggregatorV3Interface oldFeed, AggregatorV3Interface newFeed);
     ///@notice Evento emitido al ejecutar un swap por UniSwap
@@ -86,6 +111,8 @@ contract KipuBankV3 is Ownable{
     error ERC20DepositNotAllowed(address to, address tokenAddress, uint amount);
     ///@notice Error emitido cuando se intenta extraer una cantidad inválda de un token ERC20 (<=0, >saldo)
     error ERC20ExtractionNotAllowed(address to, address tokenAddress, uint amount);
+    ///@notice Error emitido cuando se intenta extraer una cantidad inválda de USDC (<=0, >saldo)
+    error USDCExtractionNotAllowed(address to, uint amount);
     ///@notice Error emitido cuando falla el oráculo
     error OracleCompromised();
     ///@notice Error emitido cuando la última actualización del oráculo supera el heartbeat
@@ -126,25 +153,16 @@ contract KipuBankV3 is Ownable{
         _;
     }
 
-    /// @notice Valida que el par de tokens exista en el factory
-    /// @param tokenA Primer token
-    /// @param tokenB Segundo token
-    modifier pairExists(address tokenA, address tokenB) {
-        address pair = FACTORY.getPair(tokenA, tokenB);
-        if (pair == address(0)) {
-            revert SwapModule_PairDoesNotExist();
-        }
-        _;
-    }
-
     /*
         *@notice Constructor que recibe el bankCap como parámetro
         *@param _bankCap es el máximo que podría tener el contrato en total
         *@param _feed es el feed para conversión de monedas
         *@param _factory es la dirección de contrato de UniSwap
     */
-    constructor(uint128 _banckCap, address _feed, address _factory) Ownable(msg.sender) {
-        FACTORY = IUniswapV2Factory(_factory);
+    constructor(uint128 _banckCap, address _feed, address _router, address _usdc) Ownable(msg.sender) {
+        require(_router != address(0) && _usdc != address(0), "zero addr");
+        router = IUniswapV2Router02(_router);
+        USDC = _usdc;
         s_bankCap = _banckCap;
         s_feeds = AggregatorV3Interface(_feed);
     }
@@ -177,119 +195,38 @@ contract KipuBankV3 is Ownable{
          *@param _tokenAddress La dirección del contrato del token a depositar
          *@param _amount La cantidad a depositar de USDC
      */
-    function depositERC20(address _tokenAddress, uint256 _amount) external {
+    function depositERC20(address _tokenAddress, uint256 _amount, uint256 _minOut, uint256 _deadline) external {
         require(_amount > 0, DepositNotAllowed(msg.sender,_amount));
-        s_balances[msg.sender][_tokenAddress] += _amount;
-        s_deposits[msg.sender][_tokenAddress]++;
+        IERC20(_tokenAddress).safeTransferFrom(msg.sender, address(this), _amount);
+
+        if (_tokenAddress == USDC) {
+            require(s_totalUSDC + _amount <= s_bankCap, "bank cap exceeded");
+            s_totalUSDC += _amount;
+            s_balances[msg.sender][USDC] += _amount;
+            emit USDCDeposited(msg.sender, _amount);
+            return;
+        }
+
+        address[] memory path = new address[](2);
+        path[0] = _tokenAddress;
+        path[1] = USDC;
+
+        uint[] memory amountsOut = router.getAmountsOut(_amount, path);
+        uint estimatedUSDC = amountsOut[amountsOut.length - 1];
+        require(s_totalUSDC + estimatedUSDC <= s_bankCap, "bank cap exceeded after swap");
+
+        // approve router the needed amount
+        IERC20(_tokenAddress).approve(address(router), 0);
+        IERC20(_tokenAddress).approve(address(router), _amount);
+
+        uint[] memory amounts = router.swapExactTokensForTokens(_amount, _minOut, path, address(this), _deadline);
+        uint got = amounts[amounts.length - 1];
+
+        s_totalUSDC += got;
+        s_balances[msg.sender][USDC] += got;
 
         emit ERC20Deposited(msg.sender, _tokenAddress, _amount);
 
-        IERC20(_tokenAddress).safeTransferFrom(msg.sender, address(this), _amount);
-    }
-
-    /**
-     * @notice Función para ejecutar swaps de inputs exactos en Uniswap V2
-     * @notice Los outputs pueden variar según el valor mínimo amountOutMin
-     * @param tokenIn La dirección del token de entrada
-     * @param tokenOut La dirección del token de salida
-     * @param amountIn La cantidad a intercambiar
-     * @param amountOutMin La cantidad mínima aceptada después de un swap
-     * @dev Esta función sigue las mejores prácticas de Uniswap V2
-     * @return amountOut cantidad de tokens recibidos
-     */
-    function swapExactInputSingle(address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOutMin)
-        external
-        validTokenAddresses(tokenIn, tokenOut)
-        validAmount(amountIn)
-        pairExists(tokenIn, tokenOut)
-        returns (uint256 amountOut)
-    {
-        // Obtener el par (ya validado por el modificador pairExists)
-        address pair = FACTORY.getPair(tokenIn, tokenOut);
-
-        // 1. Obtener reservas antes del swap (para cálculo)
-        (uint256 reserve0, uint256 reserve1, ) = IUniswapV2Pair(pair).getReserves();
-
-        // Determinar cuál token es token0 y token1
-        address token0 = IUniswapV2Pair(pair).token0();
-        bool token0IsTokenIn = token0 == tokenIn;
-
-        // 2. Calcular la cantidad de salida esperada
-        uint256 amountOutExpected = getAmountOut(amountIn, token0IsTokenIn ? reserve0 : reserve1, token0IsTokenIn ? reserve1 : reserve0);
-
-        // Verificar que el cálculo produce al menos el mínimo esperado
-        if (amountOutExpected < amountOutMin) {
-            revert SwapModule_InsufficientOutputAmount();
-        }
-
-        // 3. Transferir tokens del usuario al par usando SafeERC20
-        IERC20(tokenIn).safeTransferFrom(msg.sender, pair, amountIn);
-
-        // 4. Registrar balance antes del swap para verificación
-        uint256 balanceBefore = IERC20(tokenOut).balanceOf(address(this));
-
-        // 5. Realizar el swap en el par
-        uint256 amount0Out;
-        uint256 amount1Out;
-        if (token0IsTokenIn) {
-            amount0Out = 0;
-            amount1Out = amountOutExpected;
-        } else {
-            amount0Out = amountOutExpected;
-            amount1Out = 0;
-        }
-
-        IUniswapV2Pair(pair).swap(amount0Out, amount1Out, address(this), "");
-
-        // 6. Obtener balance después del swap y calcular amountOut real
-        uint256 balanceAfter = IERC20(tokenOut).balanceOf(address(this));
-        amountOut = balanceAfter - balanceBefore;
-
-        // 7. Verificar que recibimos al menos el mínimo esperado (seguridad extra)
-        if (amountOut < amountOutMin) {
-            revert SwapModule_InsufficientOutputAmount();
-        }
-
-        // 8. Transferir tokens de salida al usuario usando SafeERC20
-        IERC20(tokenOut).safeTransfer(msg.sender, amountOut);
-
-        emit SwapModule_SwapExecuted(msg.sender, tokenIn, tokenOut, amountIn, amountOut);
-
-        return amountOut;
-    }
-
-    /**
-     * @notice Función auxiliar para calcular la cantidad de salida
-     * @param amountIn Cantidad de entrada
-     * @param reserveIn Reserva del token de entrada
-     * @param reserveOut Reserva del token de salida
-     * @return amountOut Cantidad calculada de salida
-     * @dev Implementa la fórmula AMM de Uniswap V2: amountOut = (amountIn * 997 * reserveOut) / (reserveIn * 1000 + amountIn * 997)
-     */
-    function getAmountOut(uint256 amountIn, uint256 reserveIn, uint256 reserveOut ) public pure returns (uint256 amountOut) {
-        if (amountIn == 0 || reserveIn == 0 || reserveOut == 0) {
-            revert SwapModule_InsufficientLiquidity();
-        }
-
-        // Uniswap V2 tiene una fee del 0.3% (3/1000)
-        // El input se multiplica por 997 (1000 - 3)
-        uint256 amountInWithFee = amountIn * 997;
-
-        // Calcular el denominador y numerador
-        uint256 numerator = amountInWithFee * reserveOut;
-        uint256 denominator = (reserveIn * 1000) + amountInWithFee;
-
-        amountOut = numerator / denominator;
-    }
-    
-    /**
-     * @notice Función para obtener el par de tokens
-     * @param tokenA Primer token
-     * @param tokenB Segundo token
-     * @return pair Dirección del par
-     */
-    function getPair(address tokenA, address tokenB) external view returns (address pair) {
-        return FACTORY.getPair(tokenA, tokenB);
     }
 
     /**
@@ -447,6 +384,19 @@ contract KipuBankV3 is Ownable{
         transferERC20(_tokenAddress, _amount);
         
         emit ERC20Extracted(msg.sender, _tokenAddress, _amount);        
+    }
+
+    /**
+        *@notice Función para hacer un depósito
+		*@dev Sólo se puede depositar un valor mayor a 0, siempre que no se supere el bankCap
+        *@param _amount Cantidad que se quiere extraer. Debe ser <= al balance
+    */
+    function withdrawUSDC(uint256 _amount) public  {
+        require(_amount > 0, ExtractionNotAllowed(msg.sender, _amount));
+        require(_amount <= s_balances[msg.sender][USDC], USDCExtractionNotAllowed(msg.sender, _amount));
+        s_totalUSDC -= _amount;
+        IERC20(USDC).safeTransfer(msg.sender, _amount);
+        emit USDCExtracted(msg.sender, _amount);
     }
 
     /**
